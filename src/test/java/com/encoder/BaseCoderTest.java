@@ -127,6 +127,66 @@ public class BaseCoderTest {
             }
         }
     }
+
+    @Nested
+    @DisplayName("Hexadecimal Encoding/Decoding Tests")
+    class HexadecimalTests {
+        
+        @Test
+        @DisplayName("Should decode hexadecimal string correctly")
+        void testHexDecoding() {
+            String input = "48656C6C6F"; // "Hello" in ASCII
+            int[] decoded = BaseCoder.decodeToBytes(input, BaseCoder.EncodingType.HEXADECIMAL);
+            int[] expected = {72, 101, 108, 108, 111}; // ASCII values for "Hello"
+            
+            assertArrayEquals(expected, decoded);
+        }
+        
+        @Test
+        @DisplayName("Should encode bytes to hexadecimal correctly")
+        void testHexEncoding() {
+            int[] input = {72, 101, 108, 108, 111}; // ASCII values for "Hello"
+            String encoded = BaseCoder.encodeBytes(input, BaseCoder.EncodingType.HEXADECIMAL);
+            String expected = "48656C6C6F";
+            
+            assertEquals(expected, encoded);
+        }
+        
+        @Test
+        @DisplayName("Should handle mixed case hex input")
+        void testMixedCaseHex() {
+            String lowerCase = "deadbeef";
+            String upperCase = "DEADBEEF";
+            
+            int[] decodedLower = BaseCoder.decodeToBytes(lowerCase, BaseCoder.EncodingType.HEXADECIMAL);
+            int[] decodedUpper = BaseCoder.decodeToBytes(upperCase, BaseCoder.EncodingType.HEXADECIMAL);
+            
+            assertArrayEquals(decodedLower, decodedUpper, "Mixed case should decode to same result");
+        }
+        
+        @Test
+        @DisplayName("Should reject invalid hex digits")
+        void testInvalidHexDigits() {
+            assertThrows(IllegalArgumentException.class, 
+                () -> BaseCoder.decodeToBytes("GHIJK", BaseCoder.EncodingType.HEXADECIMAL),
+                "Should reject invalid hex digits");
+        }
+    }
+
+    @Nested
+    @DisplayName("Base32 Encoding/Decoding Tests")
+    class Base32Tests {
+        
+        @Test
+        @DisplayName("Should handle Base32 encoding/decoding")
+        void testBase32() {
+            int[] input = {72, 101, 108, 108, 111}; // "Hello"
+            String encoded = BaseCoder.encodeBytes(input, BaseCoder.EncodingType.BASE32);
+            int[] decoded = BaseCoder.decodeToBytes(encoded, BaseCoder.EncodingType.BASE32);
+            
+            assertArrayEquals(input, decoded, "Base32 round-trip should preserve data");
+        }
+    }
     
     @Nested
     @DisplayName("Edge Cases and Error Handling")

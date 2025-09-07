@@ -14,8 +14,10 @@ import org.apache.commons.lang3.StringUtils;
 public class BaseCoder {
     
     public enum EncodingType {
-        OCTAL(8);
-        
+        OCTAL(8),
+    	HEXADECIMAL(16),
+        BASE32(32);
+    	
         private final int base;
         
         EncodingType(int base) {
