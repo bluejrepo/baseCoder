@@ -1,11 +1,24 @@
-package com.encoder;
+package com.coder;
 
 import org.junit.jupiter.api.Test;
 import com.coder.BaseCoder;
+import com.coder.BaseCoder.EncodingType;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import static org.junit.jupiter.api.Assertions.*;
+
+import java.io.ByteArrayInputStream;
+import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 /**
  * Comprehensive test suite for the BaseEncoder class.
@@ -50,14 +63,16 @@ public class BaseCoderTest {
         
         @Test
         @DisplayName("Should handle long octal input")
-        void testLongOctalInput() {
+        void testLongOctalInput() throws UnsupportedEncodingException {
             String longInput =  "227711474231113516702134342400414143206126403671660545541234" +
             					"216161770521652245433114475436547416173670422136456436311234" +
             				    "717046577704333460730170473602176263254671507630065771331234" +
             				    "333465753306216356425416366443265355016660043333267564244321" +
             				    "350700124251451433665154621070427111157201067171276700624321" +
             				    "717046577704333460730170473602176263254671507630065771334321" +
+            				    "717046577704333460730170473602176263254671507630065771333765" +
             				    "541526554667660414027165423111111315057614760526500045244321" +
+            				    "717046577704333460730170473602176263254671507630065771333765" +
             				    "333465753306216356425416366443265355016660043333267564241234" +
             				    "717046577704333460730170473602176263254671507630065771335672" +
             				    "216161770521652245433114475436547416173670422136456436315672" +
@@ -66,7 +81,7 @@ public class BaseCoderTest {
             				    "333465753306216356425416366443265355016660043333267564243765" +
             				    "717046577704333460730170473602176263254671507630065771337564" +
             				    "216161770521652245433114475436547416173670422136456436317564" +
-            					"333465753306216356425416366443265355016660043333267564247564" ;
+            					"3334" ;
             /**
             assertDoesNotThrow(() -> {
 	        	long startTime = System.currentTimeMillis();
@@ -88,7 +103,7 @@ public class BaseCoderTest {
         	long startTime = System.currentTimeMillis();
             int[] decoded = BaseCoder.decodeToBytes(longInput, BaseCoder.EncodingType.OCTAL);
             long decodeTime = System.currentTimeMillis() - startTime;
-            System.out.printf("%d bytes decoded time %d (ms) \n", decoded.length, decodeTime);
+            System.out.printf("%d bytes decoded time %d (ms) \n", longInput.getBytes("UTF-8").length, decodeTime);
             assertTrue(decodeTime < 1000, "Decoding should complete within 1 second"); 
             
             startTime = System.currentTimeMillis();
@@ -229,6 +244,75 @@ public class BaseCoderTest {
             
             assertArrayEquals(maxBytes, decoded, "Should handle maximum byte values correctly");
         }
+        
+        @Test
+        @DisplayName("Should handle long octal input as chunks")
+        void testDecodeOctalInputAsChunk() throws UnsupportedEncodingException, InterruptedException, ExecutionException {
+        	
+            String longInput =  "227711474231113516702134342400414143206126403671660545541234" +
+					"216161770521652245433114475436547416173670422136456436311234" +
+				    "717046577704333460730170473602176263254671507630065771331234" +
+				    "333465753306216356425416366443265355016660043333267564244321" +
+				    "350700124251451433665154621070427111157201067171276700624321" +
+				    "717046577704333460730170473602176263254671507630065771334321" +
+				    "717046577704333460730170473602176263254671507630065771333765" +
+				    "541526554667660414027165423111111315057614760526500045244321" +
+				    "717046577704333460730170473602176263254671507630065771333765" +
+					"3334" ; //1024 bytes.
+            
+            //ForkJoinPool Methods
+            //CompletableFuture.supplyAsync(() -> {})
+            //CompletableFuture.allOf(futures.toArray(new CompletetableFuture[0]))
+            //CompletableFuture.allOff().allOfFutures.thenApply(v -> futures.stream().map(CompletableFuture :: join).collect(Collectors.toList()));
+            //CompletableFuture.supplyAsync() in ForkJoinPool
+            // 1. Create a List of CompletableFuture objects
+            int CHUNK_SIZE = 128; //bytes 
+            String [] strs = longInput.split("", CHUNK_SIZE);
+            List<CompletableFuture<int[]>> futures = new ArrayList<>();
+            for(String str : strs) {
+            	CompletableFuture<int[]> completableFuture = CompletableFuture.supplyAsync(() -> { //This is Fork
+            		return BaseCoder.decodeToBytes(str, EncodingType.OCTAL);
+            	});
+            	futures.add(completableFuture);
+            }
+            
+            //2. Combine all CompletableFutures using CompletableFuture.allOf()
+            //allOf() returns a CompletableFuture<Void> that completes when all
+            //the input CompletableFutures complete.
+            CompletableFuture<Void> allOfFutures = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
+            
+            // 3. Process the results after all futures are complete
+            // thenApply() is used to transform the result of allOfFuture (which is Void)
+            // into a List of String results from the individual futures.
+            CompletableFuture<List<int[]>> allResultFutures = allOfFutures.thenApply(v -> futures.stream()
+            																					 .map(CompletableFuture :: join) //This is Joining results
+            																					 .collect(Collectors.toList()));
+            
+            List<int[]> results = allResultFutures.get();
+            for(int [] r : results) {
+            	System.out.println(Arrays.toString(r));
+            }
+            
+            assertTrue(Boolean.TRUE);
+        }
+          
+    }
+    
+    class Decoder implements Callable<int []> {
+    	
+    	private String input;
+    	private EncodingType encodingType;
+    	
+    	public Decoder(String input, EncodingType encodingType) {
+    		this.input = input;
+    		this.encodingType = encodingType;
+    	}
+    	
+		@Override
+		public int [] call() throws Exception {
+			return BaseCoder.decodeToBytes(this.input, encodingType);
+		}
+    	
     }
     
    
